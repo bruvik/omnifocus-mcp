@@ -66,6 +66,27 @@
       }
     },
     {
+      "name": "completeTask",
+      "description": "Mark an OmniFocus task as completed by its identifier.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string", "description": "OmniFocus task identifier to complete." }
+        },
+        "required": ["task_id"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok"], "description": "Indicates the task was completed successfully." },
+          "id": { "type": "string", "description": "Identifier of the completed task." },
+          "name": { "type": "string", "description": "Name of the completed task." },
+          "error": { "type": "string", "description": "Error message if the completion failed." }
+        },
+        "required": ["status"]
+      }
+    },
+    {
       "name": "getProjects",
       "description": "Retrieve all OmniFocus projects with their names and identifiers.",
       "input_schema": {

@@ -78,3 +78,22 @@ def get_projects():
     except AppleScriptError as exc:
         logger.exception("AppleScript error during getProjects")
         return JSONResponse(status_code=500, content={"error": str(exc)})
+
+
+@app.post("/mcp/completeTask")
+def complete_task(task_id: str):
+    script_path = Path(__file__).resolve().parent / "scripts" / "complete_task.applescript"
+    logger.info("Received completeTask request task_id=%s", task_id)
+    try:
+        output = run_script(script_path, task_id)
+        logger.info("completeTask AppleScript output: %s", output)
+        return json.loads(output)
+    except json.JSONDecodeError:
+        logger.exception("Failed to decode JSON from completeTask output")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Invalid JSON returned from complete_task script"},
+        )
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error during completeTask")
+        return JSONResponse(status_code=500, content={"error": str(exc)})
