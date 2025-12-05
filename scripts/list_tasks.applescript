@@ -34,11 +34,19 @@ on iso_date_string(d)
 end iso_date_string
 
 on run argv
+	set filterKey to ""
+	if (count of argv) is greater than 0 then
+		set filterKey to item 1 of argv
+	end if
+
+	set soonThreshold to (current date) + (1 * days)
+
 	tell application "OmniFocus"
 		tell default document
 			set taskList to every flattened task
 
 			set jsonText to "{\"tasks\":["
+			set isFirst to true
 			repeat with i from 1 to count of taskList
 				set t to item i of taskList
 
@@ -46,6 +54,8 @@ on run argv
 				set taskName to my json_escape(name of t as text)
 				set taskCompleted to (completed of t)
 				set taskFlagged to (flagged of t)
+
+				set includeTask to true
 
 				set projectName to ""
 				try
@@ -60,6 +70,7 @@ on run argv
 				set noteEscaped to my json_escape(noteText)
 
 				set dueDateStr to ""
+				set dueDateVal to missing value
 				try
 					set dueDateVal to due date of t
 					if dueDateVal is not missing value then
@@ -67,18 +78,37 @@ on run argv
 					end if
 				end try
 
-				if dueDateStr is "" then
-					set dueJson to "\"\""
-				else
-					set dueJson to "\"" & dueDateStr & "\""
+				if filterKey is "flagged" then
+					if taskFlagged is false then set includeTask to false
+				else if filterKey is "due_soon" then
+					set includeTask to false
+					if dueDateVal is not missing value then
+						if dueDateVal is less than or equal to soonThreshold then set includeTask to true
+					end if
+				else if filterKey is "inbox" then
+					set includeTask to false
+					try
+						if (in inbox of t) is true then set includeTask to true
+					end try
 				end if
 
-				set itemJson to "{\"name\":\"" & taskName & "\",\"id\":\"" & taskId & "\",\"project\":\"" & projectEscaped & "\",\"due\":" & dueJson & ",\"flagged\":" & (taskFlagged as string) & ",\"completed\":" & (taskCompleted as string) & ",\"note\":\"" & noteEscaped & "\"}"
-
-				if i is 1 then
-					set jsonText to jsonText & itemJson
+				if includeTask is false then
+					-- skip task not matching filter
 				else
-					set jsonText to jsonText & "," & itemJson
+					if dueDateStr is "" then
+						set dueJson to "\"\""
+					else
+						set dueJson to "\"" & dueDateStr & "\""
+					end if
+
+					set itemJson to "{\"name\":\"" & taskName & "\",\"id\":\"" & taskId & "\",\"project\":\"" & projectEscaped & "\",\"due\":" & dueJson & ",\"flagged\":" & (taskFlagged as string) & ",\"completed\":" & (taskCompleted as string) & ",\"note\":\"" & noteEscaped & "\"}"
+
+					if isFirst then
+						set jsonText to jsonText & itemJson
+						set isFirst to false
+					else
+						set jsonText to jsonText & "," & itemJson
+					end if
 				end if
 			end repeat
 			set jsonText to jsonText & "]}"

@@ -25,12 +25,27 @@ def health():
     return {"status": "ok"}
 
 
+ALLOWED_LIST_FILTERS = {"due_soon", "flagged", "inbox"}
+
+
 @app.get("/mcp/listTasks")
-def list_tasks():
+def list_tasks(filter: str | None = None):
     script_path = Path(__file__).resolve().parent / "scripts" / "list_tasks.applescript"
-    logger.info("Received listTasks request")
+    logger.info("Received listTasks request filter=%s", filter)
+
+    args: list[str] = []
+    if filter:
+        if filter not in ALLOWED_LIST_FILTERS:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Invalid filter. Allowed values: due_soon, flagged, inbox."
+                },
+            )
+        args.append(filter)
+
     try:
-        output = run_script(script_path)
+        output = run_script(script_path, *args)
         logger.info("listTasks AppleScript output: %s", output)
         return json.loads(output)
     except json.JSONDecodeError as exc:
