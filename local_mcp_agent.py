@@ -22,12 +22,9 @@ def mcp_tools_to_ollama_tools(manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
         params = tool.get("input_schema") or {"type": "object", "properties": {}, "required": []}
         tools.append(
             {
-                "type": "function",
-                "function": {
-                    "name": tool.get("name"),
-                    "description": tool.get("description", ""),
-                    "parameters": params,
-                },
+                "name": tool.get("name"),
+                "description": tool.get("description", ""),
+                "parameters": params,
             }
         )
     return tools
@@ -47,7 +44,7 @@ def call_local_model(
     """
     payload: Dict[str, Any] = {"model": model, "messages": messages, "stream": False}
     if tools:
-        payload["tools"] = tools
+        payload["functions"] = tools
 
     try:
         resp = requests.post(
@@ -74,25 +71,23 @@ def call_local_model(
 def extract_tool_call(response: Dict[str, Any]) -> Dict[str, Any] | None:
     """
     Expecting something like:
-      { "message": { "tool_calls": [ { "type": "function", "function": { "name": ..., "arguments": "{...json...}" } } ] } }
+      { "message": { "function_call": { "name": ..., "arguments": "{...json...}" } } }
     """
     message = response.get("message") or response.get("messages", [{}])[0]
     if not message:
         return None
 
-    tool_calls = message.get("tool_calls") or []
-    if not tool_calls:
+    fn_call = message.get("function_call")
+    if not fn_call:
         return None
 
-    first = tool_calls[0]
-    function_part = first.get("function") or {}
-    args_raw = function_part.get("arguments", "{}")
+    args_raw = fn_call.get("arguments", "{}")
     try:
         args = json.loads(args_raw) if args_raw else {}
     except json.JSONDecodeError:
         args = {}
 
-    return {"name": function_part.get("name"), "arguments": args}
+    return {"name": fn_call.get("name"), "arguments": args}
 
 # ------------------------------------------------------
 # 4. Call MCP server endpoint (based on manifest tool definition)
