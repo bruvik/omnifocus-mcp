@@ -74,16 +74,33 @@ def extract_tool_call(response: Dict[str, Any]) -> Dict[str, Any] | None:
         return None
 
     fn_call = message.get("function_call")
-    if not fn_call:
-        return None
+    if fn_call:
+        args_raw = fn_call.get("arguments", "{}")
+        try:
+            args = json.loads(args_raw) if args_raw else {}
+        except json.JSONDecodeError:
+            args = {}
+        return {"name": fn_call.get("name"), "arguments": args}
 
-    args_raw = fn_call.get("arguments", "{}")
-    try:
-        args = json.loads(args_raw) if args_raw else {}
-    except json.JSONDecodeError:
-        args = {}
+    content = message.get("content")
+    if isinstance(content, str):
+        trimmed = content.strip()
+        if trimmed.startswith("{") and "function_call" in trimmed:
+            try:
+                parsed = json.loads(trimmed)
+                fn_call = parsed.get("function_call")
+                if fn_call:
+                    args_raw = fn_call.get("arguments", "{}")
+                    try:
+                        args = json.loads(args_raw) if args_raw else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                    return {"name": fn_call.get("name"), "arguments": args}
+            except Exception as exc:
+                print("Failed to parse potential function_call JSON from content:", content)
+                print("Parse error:", exc)
 
-    return {"name": fn_call.get("name"), "arguments": args}
+    return None
 
 # ------------------------------------------------------
 # 4. Call MCP server endpoint (based on manifest tool definition)
