@@ -1,12 +1,95 @@
 {
-  "schema_version": "v1",
+  "schema_version": "1.0",
   "name": "omnifocus-mcp",
   "version": "0.1.0",
   "description": "MCP server that surfaces OmniFocus tasks via FastAPI using AppleScript.",
-  "host": {
-    "server": {
-      "command": "python",
-      "args": ["server.py"]
+  "server": {
+    "command": "python",
+    "args": ["server.py"]
+  },
+  "tools": [
+    {
+      "name": "listTasks",
+      "description": "List all OmniFocus tasks with project, due, flagged, completed, and note fields.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string", "description": "Task title." },
+                "id": { "type": "string", "description": "OmniFocus task identifier." },
+                "project": { "type": "string", "description": "Containing project name (empty if none)." },
+                "due": { "type": "string", "description": "Due date as ISO string, empty if none." },
+                "flagged": { "type": "boolean", "description": "Whether the task is flagged." },
+                "completed": { "type": "boolean", "description": "Whether the task is completed." },
+                "note": { "type": "string", "description": "Task note text (may be empty)." }
+              },
+              "required": ["name", "id", "project", "due", "flagged", "completed", "note"]
+            }
+          }
+        },
+        "required": ["tasks"]
+      }
+    },
+    {
+      "name": "addTask",
+      "description": "Create a new OmniFocus task, optionally assigning it to a project; defaults to the inbox.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the task to create."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional project name to place the task under; if omitted, task is added to the inbox."
+          }
+        },
+        "required": ["title"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok"], "description": "Indicates the task was created successfully." },
+          "output": { "type": "string", "description": "Raw JSON string returned by the AppleScript describing the created task." }
+        },
+        "required": ["status", "output"]
+      }
+    },
+    {
+      "name": "getProjects",
+      "description": "Retrieve all OmniFocus projects with their names and identifiers.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "description": "OmniFocus project identifier." },
+                "name": { "type": "string", "description": "Project name." }
+              },
+              "required": ["id", "name"]
+            }
+          }
+        },
+        "required": ["projects"]
+      }
     }
-  }
+  ]
 }
