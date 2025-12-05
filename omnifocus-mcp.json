@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0",
+  "name": "omnifocus-mcp",
+  "description": "Local MCP client definition for the OmniFocus MCP FastAPI server.",
+  "base_url": "http://localhost:8000",
+  "tools": [
+    {
+      "name": "listTasks",
+      "description": "List OmniFocus tasks with optional filters (due_soon, flagged, inbox).",
+      "method": "GET",
+      "path": "/mcp/listTasks",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": ["due_soon", "flagged", "inbox"],
+            "description": "Optional filter for tasks."
+          }
+        },
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "id": { "type": "string" },
+                "project": { "type": "string" },
+                "due": { "type": "string" },
+                "flagged": { "type": "boolean" },
+                "completed": { "type": "boolean" },
+                "note": { "type": "string" }
+              },
+              "required": ["name", "id", "project", "due", "flagged", "completed", "note"]
+            }
+          }
+        },
+        "required": ["tasks"]
+      }
+    },
+    {
+      "name": "addTask",
+      "description": "Create a new OmniFocus task, optionally assigning it to a project.",
+      "method": "POST",
+      "path": "/mcp/addTask",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "Title of the new task." },
+          "project": { "type": "string", "description": "Optional project name to place the task in." }
+        },
+        "required": ["title"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "output": { "type": "string" }
+        },
+        "required": ["status", "output"]
+      }
+    },
+    {
+      "name": "completeTask",
+      "description": "Mark an OmniFocus task as completed by ID.",
+      "method": "POST",
+      "path": "/mcp/completeTask",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string", "description": "Task identifier to complete." }
+        },
+        "required": ["task_id"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "error": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "getProjects",
+      "description": "Retrieve all OmniFocus projects with their names and identifiers.",
+      "method": "GET",
+      "path": "/mcp/getProjects",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"]
+            }
+          }
+        },
+        "required": ["projects"]
+      }
+    },
+    {
+      "name": "summarizeTasks",
+      "description": "Summarize OmniFocus tasks by project with counts for active, flagged, due today, and overdue.",
+      "method": "GET",
+      "path": "/mcp/summarizeTasks",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": { "type": "string" },
+                "active": { "type": "integer" },
+                "flagged": { "type": "integer" },
+                "due_today": { "type": "integer" },
+                "overdue": { "type": "integer" }
+              },
+              "required": ["project", "active", "flagged", "due_today", "overdue"]
+            }
+          }
+        },
+        "required": ["projects"]
+      }
+    }
+  ]
+}
