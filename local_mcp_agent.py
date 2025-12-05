@@ -117,8 +117,17 @@ def call_mcp_server(
     tools: Dict[str, Dict[str, Any]],
     base_url: str,
 ):
+    def normalize(name: str) -> str:
+        return "".join(ch.lower() for ch in name if ch.isalnum() or ch == "_")
+
     if tool_name not in tools:
-        raise RuntimeError(f"Unknown tool: {tool_name}")
+        # Attempt a normalized lookup (helps when model returns snake_case vs camelCase)
+        norm = normalize(tool_name)
+        candidates = {normalize(k): k for k in tools}
+        if norm in candidates:
+            tool_name = candidates[norm]
+        else:
+            raise RuntimeError(f"Unknown tool: {tool_name}")
 
     if not isinstance(arguments, dict):
         raise RuntimeError(f"Tool arguments must be an object, got: {arguments}")
