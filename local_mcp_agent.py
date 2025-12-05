@@ -21,11 +21,7 @@ def mcp_tools_to_ollama_tools(manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
     for tool in manifest.get("tools", []):
         params = tool.get("input_schema") or {"type": "object", "properties": {}, "required": []}
         tools.append(
-            {
-                "name": tool.get("name"),
-                "description": tool.get("description", ""),
-                "parameters": params,
-            }
+            {"name": tool.get("name"), "description": tool.get("description", ""), "parameters": params}
         )
     return tools
 
@@ -137,12 +133,16 @@ def mcp_conversation():
         {
             "role": "system",
             "content": (
-                "You are an MCP-compatible agent. When tools are provided, ALWAYS call a tool if "
-                "the user request relates to that tool. Do not answer directly. Respond ONLY with "
-                "a tool call in JSON format when appropriate."
+                "You are an MCP-compatible agent. You have access to the following functions. When the user asks for something that any function can perform, you MUST call a function. You must respond ONLY using a JSON object with the field `function_call`. The format is strictly:\n\n"
+                "{\n  \"function_call\": {\n    \"name\": \"FUNCTION_NAME\",\n    \"arguments\": JSON_OBJECT\n  }\n}\n\n"
+                "Do not invent other fields. Do not answer normally when a function is relevant. Always call the appropriate function."
             ),
         }
     ]
+    conversation.insert(
+        1,
+        {"role": "assistant", "content": "{\"function_call\": {\"name\": \"listTasks\", \"arguments\": {}}}"},
+    )
 
     while True:
         user_input = input("\nUser: ")
