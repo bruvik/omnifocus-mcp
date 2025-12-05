@@ -4,17 +4,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from utils.applescript import AppleScriptError, run_script
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class AddTaskRequest(BaseModel):
-    title: str
-    project: str | None = None
 
 
 app = FastAPI(title="OmniFocus MCP Server")
@@ -28,11 +22,13 @@ def health():
 ALLOWED_LIST_FILTERS = {"due_soon", "flagged", "inbox"}
 
 
-@app.get("/mcp/listTasks")
-def list_tasks(filter: str | None = None):
+@app.post("/mcp/listTasks")
+async def list_tasks(payload: dict | None = None):
     script_path = Path(__file__).resolve().parent / "scripts" / "list_tasks.applescript"
-    logger.info("Received listTasks request filter=%s", filter)
+    logger.info("Received listTasks request")
 
+    payload = payload or {}
+    filter = payload.get("filter")
     args: list[str] = []
     if filter:
         if filter not in ALLOWED_LIST_FILTERS:
@@ -59,11 +55,11 @@ def list_tasks(filter: str | None = None):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.get("/mcp/summarizeTasks")
-def summarize_tasks():
+@app.post("/mcp/summarizeTasks")
+async def summarize_tasks(payload: dict | None = None):
     logger.info("Received summarizeTasks request")
 
-    tasks_response = list_tasks()
+    tasks_response = await list_tasks(payload)
     if isinstance(tasks_response, JSONResponse) and tasks_response.status_code != 200:
         return tasks_response
 
@@ -125,12 +121,16 @@ def summarize_tasks():
 
 
 @app.post("/mcp/addTask", status_code=201)
-def add_task(payload: AddTaskRequest):
+async def add_task(payload: dict):
+    title = payload.get("title")
+    project = payload.get("project")
     script_path = Path(__file__).resolve().parent / "scripts" / "add_task.applescript"
-    logger.info("Received addTask request title=%s project=%s", payload.title, payload.project)
-    args = [payload.title]
-    if payload.project:
-        args.append(payload.project)
+    logger.info("Received addTask request title=%s project=%s", title, project)
+    args = []
+    if title:
+        args.append(title)
+    if project:
+        args.append(project)
 
     try:
         output = run_script(script_path, *args)
@@ -141,8 +141,8 @@ def add_task(payload: AddTaskRequest):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.get("/mcp/getProjects")
-def get_projects():
+@app.post("/mcp/getProjects")
+async def get_projects(payload: dict | None = None):
     script_path = Path(__file__).resolve().parent / "scripts" / "get_projects.applescript"
     logger.info("Received getProjects request")
     try:
@@ -161,7 +161,8 @@ def get_projects():
 
 
 @app.post("/mcp/completeTask")
-def complete_task(task_id: str):
+async def complete_task(payload: dict):
+    task_id = payload.get("task_id")
     script_path = Path(__file__).resolve().parent / "scripts" / "complete_task.applescript"
     logger.info("Received completeTask request task_id=%s", task_id)
     try:
