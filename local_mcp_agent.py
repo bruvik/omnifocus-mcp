@@ -38,7 +38,7 @@ def mcp_tools_to_ollama_tools(manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
 # ------------------------------------------------------
 def call_local_model(
     messages: List[Dict[str, str]],
-    model: str = "llama3:latest",
+    model: str = "qwen2.5:7b-instruct",
     tools: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """
