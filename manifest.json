@@ -87,6 +87,35 @@
       }
     },
     {
+      "name": "summarizeTasks",
+      "description": "Summarize OmniFocus tasks by project and status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": { "type": "string", "description": "Project name (empty for inbox/unassigned)." },
+                "active": { "type": "integer", "description": "Count of active tasks (not completed)." },
+                "flagged": { "type": "integer", "description": "Count of flagged tasks." },
+                "due_today": { "type": "integer", "description": "Count of tasks due today." },
+                "overdue": { "type": "integer", "description": "Count of tasks overdue." }
+              },
+              "required": ["project", "active", "flagged", "due_today", "overdue"]
+            }
+          }
+        },
+        "required": ["projects"]
+      }
+    },
+    {
       "name": "getProjects",
       "description": "Retrieve all OmniFocus projects with their names and identifiers.",
       "input_schema": {

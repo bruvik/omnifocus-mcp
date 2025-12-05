@@ -59,6 +59,71 @@ def list_tasks(filter: str | None = None):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
+@app.get("/mcp/summarizeTasks")
+def summarize_tasks():
+    logger.info("Received summarizeTasks request")
+
+    tasks_response = list_tasks()
+    if isinstance(tasks_response, JSONResponse) and tasks_response.status_code != 200:
+        return tasks_response
+
+    try:
+        tasks_data = tasks_response["tasks"]  # type: ignore[index]
+    except Exception:
+        logger.exception("Unexpected format from listTasks")
+        return JSONResponse(
+            status_code=500, content={"error": "Failed to read tasks for summary"}
+        )
+
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    today_date = now.date()
+
+    def parse_due(due_str: str):
+        if not due_str:
+            return None
+        try:
+            # Expecting YYYY-MM-DDTHH:MM:SS
+            return datetime.fromisoformat(due_str)
+        except Exception:
+            return None
+
+    summary: dict[str, dict[str, int | str]] = {}
+
+    for task in tasks_data:
+        project = task.get("project", "") or ""
+        if project not in summary:
+            summary[project] = {
+                "project": project,
+                "active": 0,
+                "flagged": 0,
+                "due_today": 0,
+                "overdue": 0,
+            }
+
+        entry = summary[project]
+
+        if not task.get("completed", False):
+            entry["active"] += 1  # type: ignore[assignment]
+
+        if task.get("flagged", False):
+            entry["flagged"] += 1  # type: ignore[assignment]
+
+        due_str = task.get("due", "")
+        due_dt = parse_due(due_str)
+        if due_dt:
+            if due_dt.date() == today_date:
+                entry["due_today"] += 1  # type: ignore[assignment]
+            if due_dt < now:
+                entry["overdue"] += 1  # type: ignore[assignment]
+
+    projects_list = list(summary.values())
+
+    logger.info("summarizeTasks result: %s", projects_list)
+    return {"projects": projects_list}
+
+
 @app.post("/mcp/addTask", status_code=201)
 def add_task(payload: AddTaskRequest):
     script_path = Path(__file__).resolve().parent / "scripts" / "add_task.applescript"
