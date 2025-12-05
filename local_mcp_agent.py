@@ -77,7 +77,10 @@ def extract_tool_call(response: Dict[str, Any]) -> Dict[str, Any] | None:
     if fn_call:
         args_raw = fn_call.get("arguments", "{}")
         try:
-            args = json.loads(args_raw) if args_raw else {}
+            if isinstance(args_raw, dict):
+                args = args_raw
+            else:
+                args = json.loads(args_raw) if args_raw else {}
         except json.JSONDecodeError:
             args = {}
         return {"name": fn_call.get("name"), "arguments": args}
@@ -92,7 +95,10 @@ def extract_tool_call(response: Dict[str, Any]) -> Dict[str, Any] | None:
                 if fn_call:
                     args_raw = fn_call.get("arguments", "{}")
                     try:
-                        args = json.loads(args_raw) if args_raw else {}
+                        if isinstance(args_raw, dict):
+                            args = args_raw
+                        else:
+                            args = json.loads(args_raw) if args_raw else {}
                     except json.JSONDecodeError:
                         args = {}
                     return {"name": fn_call.get("name"), "arguments": args}
