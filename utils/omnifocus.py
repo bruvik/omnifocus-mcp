@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .applescript import AppleScriptError, run_script
+from .applescript import AppleScriptError, run_script_json
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
@@ -16,39 +16,40 @@ class OmniFocusError(RuntimeError):
 @dataclass
 class Task:
     id: str
-    name: str
+    title: str
     completed: bool
 
 
 def list_inbox_tasks() -> list[Task]:
     script = SCRIPTS_DIR / "list_tasks.applescript"
     try:
-        raw_output = run_script(script)
+        data = run_script_json(script)
     except AppleScriptError as exc:
         raise OmniFocusError(str(exc)) from exc
 
-    if not raw_output:
+    if not data:
         return []
 
-    tasks: list[Task] = []
-    for line in raw_output.splitlines():
-        parts = line.split("\t")
-        if len(parts) != 3:
-            continue
-        task_id, name, completed_str = parts
-        tasks.append(Task(id=task_id, name=name, completed=completed_str.lower() == "true"))
-    return tasks
+    tasks_data = data.get("tasks", [])
+    return [
+        Task(
+            id=str(item.get("id", "")),
+            title=str(item.get("name", item.get("title", ""))),
+            completed=bool(item.get("completed", False)),
+        )
+        for item in tasks_data
+    ]
 
 
-def add_inbox_task(name: str, note: str | None = None) -> str:
+def add_inbox_task(title: str, project: str | None = None) -> dict:
     script = SCRIPTS_DIR / "add_task.applescript"
-    args = [name]
-    if note:
-        args.append(note)
+    args = [title]
+    if project:
+        args.append(project)
 
     try:
-        task_id = run_script(script, args)
+        result = run_script_json(script, args)
     except AppleScriptError as exc:
         raise OmniFocusError(str(exc)) from exc
 
-    return task_id
+    return result

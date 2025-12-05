@@ -1,6 +1,6 @@
 # OmniFocus MCP Server
 
-FastAPI server that surfaces OmniFocus inbox tasks through a simple MCP-friendly API backed by AppleScript.
+FastAPI server that exposes OmniFocus tasks to Model Context Protocol (MCP) hosts via AppleScript.
 
 ## Prerequisites
 
@@ -21,16 +21,17 @@ pip install -r requirements.txt
 uvicorn server:app --reload
 ```
 
-### Endpoints
+## Endpoints
 
-- `GET /tasks` – list inbox tasks (id, name, completed)
-- `POST /tasks` – create a new inbox task: body `{"name": "Do the thing", "note": "optional note"}`
+- `GET /health` – simple healthcheck
+- `GET /mcp/listTasks` – returns `{"tasks": [...]}` from `scripts/list_tasks.applescript`
+- `POST /mcp/addTask` – body `{"title": "...", "project": "optional"}`; delegates to `scripts/add_task.applescript`
 
 ## AppleScript helpers
 
-The server shells out to `osascript` to call the AppleScript files in `scripts/`. You can test them directly, for example:
+The server shells out to `osascript` to call the scripts in `scripts/`. You can test them directly:
 
 ```bash
-osascript scripts/add_task.applescript "Read docs" "Add more detail here"
 osascript scripts/list_tasks.applescript
+osascript scripts/add_task.applescript "Pick up milk" "Home"
 ```

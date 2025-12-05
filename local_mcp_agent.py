@@ -127,7 +127,10 @@ def call_mcp_server(
         if norm in candidates:
             tool_name = candidates[norm]
         else:
-            raise RuntimeError(f"Unknown tool: {tool_name}")
+            valid_tools = ", ".join(sorted(tools.keys()))
+            raise RuntimeError(
+                f"Unknown tool: '{tool_name}'. Valid tools are: {valid_tools}"
+            )
 
     if not isinstance(arguments, dict):
         raise RuntimeError(f"Tool arguments must be an object, got: {arguments}")
@@ -161,19 +164,34 @@ def mcp_conversation():
 
     print("\nType your request (or 'quit').")
 
+    # Build explicit tool list for system prompt
+    tool_names_list = "\n".join([f"- {tool['name']}: {tool.get('description', '')}" for tool in tools_list])
+    tool_schemas = "\n\n".join([
+        f"{tool['name']}:\n  Parameters: {json.dumps(tool.get('input_schema', {}).get('properties', {}), indent=2)}"
+        for tool in tools_list
+    ])
+
     conversation = [
         {
             "role": "system",
             "content": (
-                "You are an MCP-compatible agent. You have access to the following functions. When the user asks for something that any function can perform, you MUST call a function. You must respond ONLY using a JSON object with the field `function_call`. The format is strictly:\n\n"
-                "{\n  \"function_call\": {\n    \"name\": \"FUNCTION_NAME\",\n    \"arguments\": JSON_OBJECT\n  }\n}\n\n"
-                "Do not invent other fields. Do not answer normally when a function is relevant. Always call the appropriate function."
+                "You are an MCP-compatible agent with access to these EXACT functions (use these names exactly):\n\n"
+                f"{tool_names_list}\n\n"
+                "FUNCTION SCHEMAS:\n"
+                f"{tool_schemas}\n\n"
+                "CRITICAL RULES:\n"
+                "1. Use the EXACT function names listed above (e.g., 'list_tasks' not 'listTasks')\n"
+                "2. Only use parameters defined in the schema - DO NOT invent parameters\n"
+                "3. When the user asks for something a function can perform, you MUST call that function\n"
+                "4. Respond ONLY with a JSON object in this format:\n\n"
+                "{\n  \"function_call\": {\n    \"name\": \"EXACT_FUNCTION_NAME\",\n    \"arguments\": {JSON_OBJECT_WITH_ONLY_DEFINED_PARAMETERS}\n  }\n}\n\n"
+                "5. Do not answer normally when a function is relevant. Always call the appropriate function."
             ),
         }
     ]
     conversation.insert(
         1,
-        {"role": "assistant", "content": "{\"function_call\": {\"name\": \"listTasks\", \"arguments\": {}}}"},
+        {"role": "assistant", "content": "{\"function_call\": {\"name\": \"list_tasks\", \"arguments\": {}}}"},
     )
 
     while True:
@@ -191,16 +209,47 @@ def mcp_conversation():
             arguments = tool_call.get("arguments", {})
             print(f"\n[Tool call detected: {tool_name}({arguments})]")
 
+            actual_tool_name = tool_name  # Track which tool actually succeeded
             try:
                 result = call_mcp_server(tool_name, arguments, tools, base_url)  # type: ignore[arg-type]
             except Exception as exc:
-                print(f"\nError calling tool {tool_name}: {exc}")
-                continue
+                error_msg = f"Error calling tool {tool_name}: {exc}"
+                print(f"\n{error_msg}")
+
+                # Feed error back to AI so it can self-correct
+                conversation.append(
+                    {
+                        "role": "tool",
+                        "name": tool_name,
+                        "content": json.dumps({"error": str(exc)}),
+                    }
+                )
+
+                # Let AI try again with the error context
+                response2 = call_local_model(conversation, tools=tools_ollama)
+                tool_call2 = extract_tool_call(response2)
+
+                if tool_call2:
+                    # Retry with corrected tool call
+                    tool_name2 = tool_call2.get("name")
+                    arguments2 = tool_call2.get("arguments", {})
+                    print(f"\n[AI retrying with: {tool_name2}({arguments2})]")
+                    try:
+                        result = call_mcp_server(tool_name2, arguments2, tools, base_url)  # type: ignore[arg-type]
+                        actual_tool_name = tool_name2  # Update to successful tool name
+                    except Exception as exc2:
+                        print(f"\nRetry also failed: {exc2}")
+                        continue
+                else:
+                    assistant_msg = response2.get("message", {}).get("content")
+                    if assistant_msg:
+                        print("\nAssistant:", assistant_msg)
+                    continue
 
             conversation.append(
                 {
                     "role": "tool",
-                    "name": tool_name,
+                    "name": actual_tool_name,
                     "content": json.dumps(result),
                 }
             )

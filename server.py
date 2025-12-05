@@ -22,7 +22,7 @@ def health():
 ALLOWED_LIST_FILTERS = {"due_soon", "flagged", "inbox"}
 
 
-@app.post("/mcp/listTasks")
+@app.post("/mcp/list_tasks")
 async def list_tasks(payload: dict | None = None):
     script_path = Path(__file__).resolve().parent / "scripts" / "list_tasks.applescript"
     logger.info("Received listTasks request")
@@ -55,7 +55,7 @@ async def list_tasks(payload: dict | None = None):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.post("/mcp/summarizeTasks")
+@app.post("/mcp/summarize_tasks")
 async def summarize_tasks(payload: dict | None = None):
     logger.info("Received summarizeTasks request")
 
@@ -120,7 +120,7 @@ async def summarize_tasks(payload: dict | None = None):
     return {"projects": projects_list}
 
 
-@app.post("/mcp/addTask", status_code=201)
+@app.post("/mcp/add_task", status_code=201)
 async def add_task(payload: dict):
     title = payload.get("title")
     project = payload.get("project")
@@ -141,7 +141,7 @@ async def add_task(payload: dict):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.post("/mcp/getProjects")
+@app.post("/mcp/get_projects")
 async def get_projects(payload: dict | None = None):
     script_path = Path(__file__).resolve().parent / "scripts" / "get_projects.applescript"
     logger.info("Received getProjects request")
@@ -160,7 +160,7 @@ async def get_projects(payload: dict | None = None):
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
-@app.post("/mcp/completeTask")
+@app.post("/mcp/complete_task")
 async def complete_task(payload: dict):
     task_id = payload.get("task_id")
     script_path = Path(__file__).resolve().parent / "scripts" / "complete_task.applescript"

@@ -5,10 +5,10 @@
   "base_url": "http://localhost:8000",
   "tools": [
     {
-      "name": "listTasks",
+      "name": "list_tasks",
       "description": "List OmniFocus tasks with optional filters (due_soon, flagged, inbox).",
       "method": "GET",
-      "path": "/mcp/listTasks",
+      "path": "/mcp/list_tasks",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -44,10 +44,10 @@
       }
     },
     {
-      "name": "addTask",
+      "name": "add_task",
       "description": "Create a new OmniFocus task, optionally assigning it to a project.",
       "method": "POST",
-      "path": "/mcp/addTask",
+      "path": "/mcp/add_task",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -66,10 +66,10 @@
       }
     },
     {
-      "name": "completeTask",
+      "name": "complete_task",
       "description": "Mark an OmniFocus task as completed by ID.",
       "method": "POST",
-      "path": "/mcp/completeTask",
+      "path": "/mcp/complete_task",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -89,10 +89,10 @@
       }
     },
     {
-      "name": "getProjects",
+      "name": "get_projects",
       "description": "Retrieve all OmniFocus projects with their names and identifiers.",
       "method": "GET",
-      "path": "/mcp/getProjects",
+      "path": "/mcp/get_projects",
       "input_schema": {
         "type": "object",
         "properties": {},
@@ -117,10 +117,10 @@
       }
     },
     {
-      "name": "summarizeTasks",
+      "name": "summarize_tasks",
       "description": "Summarize OmniFocus tasks by project with counts for active, flagged, due today, and overdue.",
       "method": "GET",
-      "path": "/mcp/summarizeTasks",
+      "path": "/mcp/summarize_tasks",
       "input_schema": {
         "type": "object",
         "properties": {},

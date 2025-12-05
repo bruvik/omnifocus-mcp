@@ -9,11 +9,17 @@
   },
   "tools": [
     {
-      "name": "listTasks",
+      "name": "list_tasks",
       "description": "List all OmniFocus tasks with project, due, flagged, completed, and note fields.",
       "input_schema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": ["due_soon", "flagged", "inbox"],
+            "description": "Optional filter for tasks: due_soon (tasks due within 24 hours), flagged (flagged tasks only), or inbox (inbox tasks only)."
+          }
+        },
         "required": []
       },
       "output_schema": {
@@ -40,7 +46,7 @@
       }
     },
     {
-      "name": "addTask",
+      "name": "add_task",
       "description": "Create a new OmniFocus task, optionally assigning it to a project; defaults to the inbox.",
       "input_schema": {
         "type": "object",
@@ -66,7 +72,7 @@
       }
     },
     {
-      "name": "completeTask",
+      "name": "complete_task",
       "description": "Mark an OmniFocus task as completed by its identifier.",
       "input_schema": {
         "type": "object",
@@ -87,7 +93,7 @@
       }
     },
     {
-      "name": "summarizeTasks",
+      "name": "summarize_tasks",
       "description": "Summarize OmniFocus tasks by project and status.",
       "input_schema": {
         "type": "object",
@@ -116,7 +122,7 @@
       }
     },
     {
-      "name": "getProjects",
+      "name": "get_projects",
       "description": "Retrieve all OmniFocus projects with their names and identifiers.",
       "input_schema": {
         "type": "object",
