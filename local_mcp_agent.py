@@ -19,13 +19,14 @@ def mcp_tools_to_ollama_tools(manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     tools = []
     for tool in manifest.get("tools", []):
+        params = tool.get("input_schema") or {"type": "object", "properties": {}, "required": []}
         tools.append(
             {
                 "type": "function",
                 "function": {
                     "name": tool.get("name"),
                     "description": tool.get("description", ""),
-                    "parameters": tool.get("input_schema", {"type": "object", "properties": {}}),
+                    "parameters": params,
                 },
             }
         )
@@ -48,11 +49,22 @@ def call_local_model(
     if tools:
         payload["tools"] = tools
 
-    resp = requests.post(
-        "http://localhost:11434/api/chat",
-        json=payload,
-        timeout=180,
-    )
+    try:
+        resp = requests.post(
+            "http://localhost:11434/api/chat",
+            json=payload,
+            timeout=180,
+        )
+    except requests.HTTPError as exc:
+        print("Payload sent to Ollama (HTTPError):", json.dumps(payload, indent=2))
+        raise exc
+    except Exception:
+        raise
+
+    if resp.status_code >= 400:
+        print("Payload sent to Ollama (status code >=400):", json.dumps(payload, indent=2))
+        resp.raise_for_status()
+
     resp.raise_for_status()
     return resp.json()
 
@@ -62,13 +74,25 @@ def call_local_model(
 def extract_tool_call(response: Dict[str, Any]) -> Dict[str, Any] | None:
     """
     Expecting something like:
-      { "message": { "tool_call": { "name": ..., "arguments": {...} } } }
+      { "message": { "tool_calls": [ { "type": "function", "function": { "name": ..., "arguments": "{...json...}" } } ] } }
     """
     message = response.get("message") or response.get("messages", [{}])[0]
     if not message:
         return None
 
-    return message.get("tool_call")
+    tool_calls = message.get("tool_calls") or []
+    if not tool_calls:
+        return None
+
+    first = tool_calls[0]
+    function_part = first.get("function") or {}
+    args_raw = function_part.get("arguments", "{}")
+    try:
+        args = json.loads(args_raw) if args_raw else {}
+    except json.JSONDecodeError:
+        args = {}
+
+    return {"name": function_part.get("name"), "arguments": args}
 
 # ------------------------------------------------------
 # 4. Call MCP server endpoint (based on manifest tool definition)
@@ -107,7 +131,7 @@ def mcp_conversation():
     base_url = manifest.get("base_url", "http://localhost:8000")
     tools_list = manifest.get("tools", [])
     tools = {tool["name"]: tool for tool in tools_list}
-    ollama_tools = mcp_tools_to_ollama_tools(manifest)
+    tools_ollama = mcp_tools_to_ollama_tools(manifest)
 
     print("Loaded MCP tools:", list(tools.keys()))
     print(f"Using MCP server at: {base_url}")
@@ -118,9 +142,9 @@ def mcp_conversation():
         {
             "role": "system",
             "content": (
-                "You are an MCP-compatible agent. When the user asks for something "
-                "that can be answered using the available tools, you MUST call a tool. "
-                "Respond only with a tool invocation in JSON format when a tool is required."
+                "You are an MCP-compatible agent. When tools are provided, ALWAYS call a tool if "
+                "the user request relates to that tool. Do not answer directly. Respond ONLY with "
+                "a tool call in JSON format when appropriate."
             ),
         }
     ]
@@ -132,7 +156,7 @@ def mcp_conversation():
 
         conversation.append({"role": "user", "content": user_input})
 
-        response = call_local_model(conversation, tools=ollama_tools)
+        response = call_local_model(conversation, tools=tools_ollama)
         tool_call = extract_tool_call(response)
 
         if tool_call:
@@ -154,7 +178,7 @@ def mcp_conversation():
                 }
             )
 
-            response2 = call_local_model(conversation, tools=ollama_tools)
+            response2 = call_local_model(conversation, tools=tools_ollama)
             assistant_msg = response2.get("message", {}).get("content")
             if assistant_msg:
                 print("\nAssistant:", assistant_msg)
