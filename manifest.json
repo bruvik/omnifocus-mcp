@@ -1,0 +1,12 @@
+{
+  "schema_version": "v1",
+  "name": "omnifocus-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that surfaces OmniFocus tasks via FastAPI using AppleScript.",
+  "host": {
+    "server": {
+      "command": "python",
+      "args": ["server.py"]
+    }
+  }
+}
