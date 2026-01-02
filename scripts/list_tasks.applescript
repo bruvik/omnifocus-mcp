@@ -40,6 +40,7 @@ on run argv
 	end if
 
 	set soonThreshold to (current date) + (1 * days)
+	set nowDate to current date
 
 	tell application "OmniFocus"
 		tell default document
@@ -55,11 +56,53 @@ on run argv
 				set taskCompleted to (completed of t)
 				set taskFlagged to (flagged of t)
 
-				set includeTask to true
+				-- Check if effectively flagged (task or any ancestor is flagged)
+				set isEffectivelyFlagged to taskFlagged
+				if not isEffectivelyFlagged then
+					try
+						set currentTask to t
+						repeat
+							set pTask to parent task of currentTask
+							if pTask is missing value then exit repeat
+							if flagged of pTask then
+								set isEffectivelyFlagged to true
+								exit repeat
+							end if
+							set currentTask to pTask
+						end repeat
+					end try
+				end if
 
-				set projectName to ""
+				-- Check if effectively completed (includes "completed with container")
+				set isEffectivelyCompleted to false
 				try
-					set projectName to name of containing project of t as text
+					set isEffectivelyCompleted to (effectively completed of t)
+				on error
+					set isEffectivelyCompleted to taskCompleted
+				end try
+
+				-- Check if task itself is dropped (independent of project)
+				set taskDropped to false
+				try
+					set taskDropped to (dropped of t)
+				end try
+
+				-- Get project name and status
+				set projectName to ""
+				set projectStatus to "active"
+				try
+					set containingProj to containing project of t
+					if containingProj is not missing value then
+						set projectName to name of containingProj as text
+						set projStatus to status of containingProj
+						if projStatus is on hold status then
+							set projectStatus to "on_hold"
+						else if projStatus is dropped status then
+							set projectStatus to "dropped"
+						else
+							set projectStatus to "active"
+						end if
+					end if
 				end try
 				set projectEscaped to my json_escape(projectName)
 
@@ -69,6 +112,7 @@ on run argv
 				end try
 				set noteEscaped to my json_escape(noteText)
 
+				-- Get due date
 				set dueDateStr to ""
 				set dueDateVal to missing value
 				try
@@ -78,30 +122,80 @@ on run argv
 					end if
 				end try
 
-				if filterKey is "flagged" then
-					if taskFlagged is false then set includeTask to false
+				-- Get defer date
+				set deferDateStr to ""
+				set deferDateVal to missing value
+				try
+					set deferDateVal to defer date of t
+					if deferDateVal is not missing value then
+						set deferDateStr to my json_escape(my iso_date_string(deferDateVal))
+					end if
+				end try
+
+				-- Determine if task is "available" (not effectively completed, not dropped, not deferred, not in dropped/on-hold project)
+				set isAvailable to true
+				if isEffectivelyCompleted then set isAvailable to false
+				if taskDropped then set isAvailable to false
+				if projectStatus is "dropped" then set isAvailable to false
+				if projectStatus is "on_hold" then set isAvailable to false
+				if deferDateVal is not missing value then
+					if deferDateVal is greater than nowDate then set isAvailable to false
+				end if
+
+				-- Determine if task is deferred (has future defer date, not effectively completed, not dropped)
+				set isDeferred to false
+				if isEffectivelyCompleted is false and taskDropped is false and projectStatus is not "dropped" then
+					if deferDateVal is not missing value then
+						if deferDateVal is greater than nowDate then set isDeferred to true
+					end if
+				end if
+
+				-- Apply filter logic
+				set includeTask to false
+
+				if filterKey is "" then
+					-- Default: only available tasks
+					if isAvailable then set includeTask to true
+				else if filterKey is "all" then
+					-- All incomplete tasks (including deferred, excluding effectively completed and dropped)
+					if isEffectivelyCompleted is false and taskDropped is false and projectStatus is not "dropped" then set includeTask to true
+				else if filterKey is "completed" then
+					-- Only effectively completed tasks
+					if isEffectivelyCompleted then set includeTask to true
+				else if filterKey is "deferred" then
+					-- Only deferred tasks
+					if isDeferred then set includeTask to true
+				else if filterKey is "flagged" then
+					-- Available + effectively flagged (includes inherited from parent)
+					if isAvailable and isEffectivelyFlagged then set includeTask to true
 				else if filterKey is "due_soon" then
-					set includeTask to false
-					if dueDateVal is not missing value then
-						if dueDateVal is less than or equal to soonThreshold then set includeTask to true
+					-- Available + due within 24 hours
+					if isAvailable then
+						if dueDateVal is not missing value then
+							if dueDateVal is less than or equal to soonThreshold then set includeTask to true
+						end if
 					end if
 				else if filterKey is "inbox" then
-					set includeTask to false
+					-- Inbox items only
 					try
 						if (in inbox of t) is true then set includeTask to true
 					end try
 				end if
 
-				if includeTask is false then
-					-- skip task not matching filter
-				else
+				if includeTask then
 					if dueDateStr is "" then
 						set dueJson to "\"\""
 					else
 						set dueJson to "\"" & dueDateStr & "\""
 					end if
 
-					set itemJson to "{\"name\":\"" & taskName & "\",\"id\":\"" & taskId & "\",\"project\":\"" & projectEscaped & "\",\"due\":" & dueJson & ",\"flagged\":" & (taskFlagged as string) & ",\"completed\":" & (taskCompleted as string) & ",\"note\":\"" & noteEscaped & "\"}"
+					if deferDateStr is "" then
+						set deferJson to "\"\""
+					else
+						set deferJson to "\"" & deferDateStr & "\""
+					end if
+
+					set itemJson to "{\"name\":\"" & taskName & "\",\"id\":\"" & taskId & "\",\"project\":\"" & projectEscaped & "\",\"due\":" & dueJson & ",\"defer\":" & deferJson & ",\"flagged\":" & (taskFlagged as string) & ",\"completed\":" & (taskCompleted as string) & ",\"note\":\"" & noteEscaped & "\"}"
 
 					if isFirst then
 						set jsonText to jsonText & itemJson
