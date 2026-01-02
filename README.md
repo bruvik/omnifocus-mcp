@@ -96,6 +96,10 @@ Once connected, Claude Code can use these tools:
 | `add_task_tags` | Add tags to a task (keeps existing) |
 | `remove_task_tags` | Remove tags from a task |
 | `set_task_tags` | Replace all tags on a task |
+| `get_task_note` | Get a task's note/description |
+| `set_task_note` | Set a task's note (replaces existing) |
+| `append_task_note` | Append text to a task's note |
+| `clear_task_note` | Clear/remove a task's note |
 
 ### Example Prompts for Claude Code
 
@@ -187,5 +191,5 @@ MIT
 - [x] Create task should be able to create a task in a specific project (already works)
 - [x] Move task around in the Projects hierarchy (move_task tool)
 - [x] Manipulate tags on tasks (list_tags, get/add/remove/set_task_tags)
+- [x] Logic to read, write and manipulate notes on existing tasks (get/set/append/clear_task_note)
 - [ ] Handle locations
-- [ ] Logic to read, write and manipulate notes on existing tasks

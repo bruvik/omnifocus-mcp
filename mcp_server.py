@@ -724,5 +724,121 @@ def set_task_tags(task_id: str, tags: list[str]) -> dict:
         return {"error": str(exc)}
 
 
+@mcp.tool()
+def get_task_note(task_id: str) -> dict:
+    """
+    Get the note/description of a task.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+
+    Returns:
+        Dictionary with task info and note content
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "manage_note.applescript"
+    logger.info("get_task_note called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "get")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from get_task_note")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in get_task_note")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def set_task_note(task_id: str, note: str) -> dict:
+    """
+    Set the note/description of a task (replaces existing note).
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        note: The note text to set. Supports multi-line text.
+
+    Returns:
+        Dictionary with status and the new note content
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "manage_note.applescript"
+    logger.info("set_task_note called: task_id=%r note_length=%d", task_id, len(note) if note else 0)
+
+    try:
+        output = run_script(script_path, task_id, "set", note or "")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from set_task_note")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in set_task_note")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def append_task_note(task_id: str, text: str) -> dict:
+    """
+    Append text to a task's note (adds to existing note with newline).
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        text: The text to append to the note
+
+    Returns:
+        Dictionary with status and the updated note content
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+    if not text:
+        return {"error": "text is required"}
+
+    script_path = SCRIPTS_DIR / "manage_note.applescript"
+    logger.info("append_task_note called: task_id=%r text_length=%d", task_id, len(text))
+
+    try:
+        output = run_script(script_path, task_id, "append", text)
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from append_task_note")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in append_task_note")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def clear_task_note(task_id: str) -> dict:
+    """
+    Clear/remove the note from a task.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "manage_note.applescript"
+    logger.info("clear_task_note called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "clear")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from clear_task_note")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in clear_task_note")
+        return {"error": str(exc)}
+
+
 if __name__ == "__main__":
     mcp.run()
