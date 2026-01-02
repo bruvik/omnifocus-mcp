@@ -76,11 +76,19 @@ Once connected, Claude Code can use these tools:
 
 | Tool | Description |
 |------|-------------|
-| `list_tasks` | List tasks with optional filter (due_soon, flagged, inbox) |
+| `list_tasks` | List tasks with optional filter (due_soon, flagged, inbox, all, completed, deferred) |
 | `summarize_tasks` | Get task counts grouped by project |
-| `add_task` | Create a new task (optionally in a specific project) |
+| `add_task` | Create a new task with full options (project, due, defer, flagged, note, rrule) |
 | `get_projects` | List all OmniFocus projects |
 | `complete_task` | Mark a task as completed by ID |
+| `delete_task` | Permanently delete a task by ID |
+| `flag_task` | Flag or unflag a task |
+| `defer_task` | Set or clear a task's defer date |
+| `set_due_date` | Set or clear a task's due date |
+| `set_repetition` | Set or clear a task's repetition rule (RRULE format) |
+| `drop_project` | Drop (abandon) a project |
+| `pause_project` | Put a project on hold |
+| `resume_project` | Reactivate a paused project |
 
 ### Example Prompts for Claude Code
 
@@ -114,14 +122,25 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 ## Testing AppleScripts Directly
 
 ```bash
-# List all tasks
-osascript scripts/list_tasks.applescript
+# List available tasks (default)
+osascript scripts/list_tasks_omni.applescript
 
 # List with filter
-osascript scripts/list_tasks.applescript flagged
+osascript scripts/list_tasks_omni.applescript flagged
+osascript scripts/list_tasks_omni.applescript due_soon
+osascript scripts/list_tasks_omni.applescript all
 
-# Add task
-osascript scripts/add_task.applescript "Task title" "Project name"
+# Add task (JSON format)
+osascript scripts/add_task_omni.applescript '{"title": "Task name", "project": "Project name"}'
+osascript scripts/add_task_omni.applescript '{"title": "Weekly review", "rrule": "FREQ=WEEKLY", "flagged": true}'
+
+# Set repetition
+osascript scripts/set_repetition.applescript "task-id" "FREQ=DAILY" "due"
+osascript scripts/set_repetition.applescript "task-id" "none"  # Clear repetition
+
+# Update task
+osascript scripts/update_task.applescript "task-id" flag
+osascript scripts/update_task.applescript "task-id" defer "2025-01-15T09:00:00"
 
 # Get projects
 osascript scripts/get_projects.applescript
@@ -152,3 +171,13 @@ osascript scripts/complete_task.applescript "task-id-here"
 ## License
 
 MIT
+
+## Todo
+
+- [x] Handle recurring events (RRULE format with set_repetition and add_task rrule param)
+- [ ] Rename tasks
+- [x] Handle notes (add_task supports note parameter)
+- [x] Create task should be able to create a task in a specific project (already works)
+- [ ] Move task around in the Projects hierarchy
+- [ ] Manipulate tags on tasks
+- [ ] Handle locations
