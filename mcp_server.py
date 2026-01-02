@@ -569,5 +569,160 @@ def set_repetition(task_id: str, rrule: str | None = None, method: RepetitionMet
         return {"error": str(exc)}
 
 
+@mcp.tool()
+def list_tags() -> dict:
+    """
+    List all tags in OmniFocus.
+
+    Returns:
+        Dictionary with "tags" key containing list of tag objects.
+        Each tag has: id, name, path (full hierarchical path), parent, available, remaining counts.
+        Tags can be hierarchical, e.g., "Folk : Asbjørn" means "Asbjørn" under "Folk".
+    """
+    script_path = SCRIPTS_DIR / "list_tags.applescript"
+    logger.info("list_tags called")
+
+    try:
+        output = run_script(script_path)
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from list_tags")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in list_tags")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def get_task_tags(task_id: str) -> dict:
+    """
+    Get the tags currently assigned to a task.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+
+    Returns:
+        Dictionary with task info and list of tags with their paths
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "manage_tags.applescript"
+    logger.info("get_task_tags called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "get", "[]")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from get_task_tags")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in get_task_tags")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def add_task_tags(task_id: str, tags: list[str]) -> dict:
+    """
+    Add tags to a task (keeps existing tags).
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        tags: List of tag identifiers. Can be:
+              - Tag name: "Work"
+              - Full path for nested tags: "Folk : Asbjørn"
+              - Tag ID: "abc123"
+
+    Returns:
+        Dictionary with status, added tags, and current tags list
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+    if not tags:
+        return {"error": "tags list is required"}
+
+    script_path = SCRIPTS_DIR / "manage_tags.applescript"
+    logger.info("add_task_tags called: task_id=%r tags=%r", task_id, tags)
+
+    try:
+        output = run_script(script_path, task_id, "add", json.dumps(tags))
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from add_task_tags")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in add_task_tags")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def remove_task_tags(task_id: str, tags: list[str]) -> dict:
+    """
+    Remove tags from a task.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        tags: List of tag identifiers to remove. Can be:
+              - Tag name: "Work"
+              - Full path for nested tags: "Folk : Asbjørn"
+              - Tag ID: "abc123"
+
+    Returns:
+        Dictionary with status, removed tags, and current tags list
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+    if not tags:
+        return {"error": "tags list is required"}
+
+    script_path = SCRIPTS_DIR / "manage_tags.applescript"
+    logger.info("remove_task_tags called: task_id=%r tags=%r", task_id, tags)
+
+    try:
+        output = run_script(script_path, task_id, "remove", json.dumps(tags))
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from remove_task_tags")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in remove_task_tags")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def set_task_tags(task_id: str, tags: list[str]) -> dict:
+    """
+    Set the tags on a task (replaces all existing tags).
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        tags: List of tag identifiers. Can be:
+              - Tag name: "Work"
+              - Full path for nested tags: "Folk : Asbjørn"
+              - Tag ID: "abc123"
+              Use empty list [] to remove all tags.
+
+    Returns:
+        Dictionary with status and the new tags list
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+    if tags is None:
+        return {"error": "tags list is required (use [] to clear)"}
+
+    script_path = SCRIPTS_DIR / "manage_tags.applescript"
+    logger.info("set_task_tags called: task_id=%r tags=%r", task_id, tags)
+
+    try:
+        output = run_script(script_path, task_id, "set", json.dumps(tags))
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from set_task_tags")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in set_task_tags")
+        return {"error": str(exc)}
+
+
 if __name__ == "__main__":
     mcp.run()
