@@ -171,11 +171,19 @@ on run argv
 				else if actionName is "clear_due" then
 					set due date of targetTask to missing value
 
+				else if actionName is "rename" then
+					if actionValue is "" then
+						return "{\"error\":\"rename action requires a new name value\"}"
+					end if
+					set name of targetTask to actionValue
+					-- Update taskName for the response
+					set taskName to my json_escape(actionValue)
+
 				else
-					return "{\"error\":\"Unknown action: " & actionName & ". Valid: drop, delete, pause, resume, flag, unflag, defer, due, clear_defer, clear_due\"}"
+					return "{\"error\":\"Unknown action: " & actionName & ". Valid: drop, delete, pause, resume, flag, unflag, defer, due, clear_defer, clear_due, rename\"}"
 				end if
 
-				-- Return success with task info (taskId and taskName captured at start)
+				-- Return success with task info (taskId and taskName captured at start, or updated for rename)
 				return "{\"status\":\"ok\",\"action\":\"" & actionName & "\",\"id\":\"" & taskId & "\",\"name\":\"" & taskName & "\"}"
 
 			on error errMsg
