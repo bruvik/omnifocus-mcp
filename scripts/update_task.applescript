@@ -90,9 +90,36 @@ on run argv
 			try
 				set targetTask to first flattened task whose id is targetId
 
+				-- Get task info before any destructive action
+				set taskId to my json_escape(id of targetTask as text)
+				set taskName to my json_escape(name of targetTask as text)
+
 				-- Perform the action
 				if actionName is "drop" then
-					set dropped of targetTask to true
+					-- Drop only works on projects, not individual tasks
+					try
+						set containingProj to containing project of targetTask
+						if containingProj is not missing value then
+							-- It's a task within a project - dropping not supported
+							return "{\"error\":\"Cannot drop a task. Use 'delete' to remove the task, or 'complete' to mark it done.\"}"
+						else
+							-- Check if it's in the inbox
+							try
+								if (in inbox of targetTask) is true then
+									return "{\"error\":\"Cannot drop an inbox item. Use 'delete' to remove it, or 'complete' to mark it done.\"}"
+								end if
+							end try
+							-- It might be a project root task - try setting dropped
+							set dropped of targetTask to true
+						end if
+					on error errMsg
+						return "{\"error\":\"Cannot drop this item: \" & errMsg & \". Use 'delete' for tasks.\"}"
+					end try
+
+				else if actionName is "delete" then
+					-- Delete the task permanently
+					delete targetTask
+					return "{\"status\":\"ok\",\"action\":\"delete\",\"id\":\"" & taskId & "\",\"name\":\"" & taskName & "\"}"
 
 				else if actionName is "pause" then
 					-- Pause = put project on hold (only works for project tasks)
@@ -145,13 +172,10 @@ on run argv
 					set due date of targetTask to missing value
 
 				else
-					return "{\"error\":\"Unknown action: " & actionName & ". Valid: drop, pause, resume, flag, unflag, defer, due, clear_defer, clear_due\"}"
+					return "{\"error\":\"Unknown action: " & actionName & ". Valid: drop, delete, pause, resume, flag, unflag, defer, due, clear_defer, clear_due\"}"
 				end if
 
-				-- Return success with task info
-				set taskId to my json_escape(id of targetTask as text)
-				set taskName to my json_escape(name of targetTask as text)
-
+				-- Return success with task info (taskId and taskName captured at start)
 				return "{\"status\":\"ok\",\"action\":\"" & actionName & "\",\"id\":\"" & taskId & "\",\"name\":\"" & taskName & "\"}"
 
 			on error errMsg

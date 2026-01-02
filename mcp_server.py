@@ -217,9 +217,40 @@ def complete_task(task_id: str) -> dict:
 
 
 @mcp.tool()
-def drop_task(task_id: str) -> dict:
+def drop_project(task_id: str) -> dict:
     """
-    Drop (delete) a task in OmniFocus.
+    Drop a project in OmniFocus (mark as dropped/abandoned).
+
+    Note: This only works for projects, not individual tasks.
+    For tasks, use delete_task or complete_task instead.
+
+    Args:
+        task_id: The OmniFocus task ID of any task in the project
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("drop_project called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "drop")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from drop_project")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in drop_project")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def delete_task(task_id: str) -> dict:
+    """
+    Permanently delete a task from OmniFocus.
 
     Args:
         task_id: The OmniFocus task ID (from list_tasks)
@@ -231,16 +262,16 @@ def drop_task(task_id: str) -> dict:
         return {"error": "task_id is required"}
 
     script_path = SCRIPTS_DIR / "update_task.applescript"
-    logger.info("drop_task called: task_id=%r", task_id)
+    logger.info("delete_task called: task_id=%r", task_id)
 
     try:
-        output = run_script(script_path, task_id, "drop")
+        output = run_script(script_path, task_id, "delete")
         return json.loads(output)
     except json.JSONDecodeError as exc:
-        logger.exception("Failed to decode JSON from drop_task")
+        logger.exception("Failed to decode JSON from delete_task")
         return {"error": f"Invalid JSON from AppleScript: {exc}"}
     except AppleScriptError as exc:
-        logger.exception("AppleScript error in drop_task")
+        logger.exception("AppleScript error in delete_task")
         return {"error": str(exc)}
 
 
