@@ -1,6 +1,14 @@
+"""
+OmniFocus HTTP Server
+
+FastAPI-based REST API for OmniFocus task management.
+For MCP (Model Context Protocol) integration, use mcp_server.py instead.
+"""
+
 import json
 import logging
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -10,82 +18,79 @@ from utils.applescript import AppleScriptError, run_script
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 
-app = FastAPI(title="OmniFocus MCP Server")
+app = FastAPI(
+    title="OmniFocus HTTP Server",
+    description="REST API for OmniFocus task management via AppleScript",
+)
+
+FilterType = Literal["due_soon", "flagged", "inbox"]
+ALLOWED_FILTERS: set[FilterType] = {"due_soon", "flagged", "inbox"}
 
 
 @app.get("/health")
-def health():
+def health() -> dict[str, str]:
+    """Health check endpoint."""
     return {"status": "ok"}
 
 
-ALLOWED_LIST_FILTERS = {"due_soon", "flagged", "inbox"}
-
-
 @app.post("/mcp/list_tasks")
-async def list_tasks(payload: dict | None = None):
-    script_path = Path(__file__).resolve().parent / "scripts" / "list_tasks.applescript"
-    logger.info("Received listTasks request")
+async def list_tasks(payload: dict | None = None) -> dict | JSONResponse:
+    """List tasks from OmniFocus with optional filtering."""
+    script_path = SCRIPTS_DIR / "list_tasks.applescript"
+    logger.info("list_tasks request received")
 
     payload = payload or {}
-    filter = payload.get("filter")
+    filter_value = payload.get("filter")
     args: list[str] = []
-    if filter:
-        if filter not in ALLOWED_LIST_FILTERS:
+
+    if filter_value:
+        if filter_value not in ALLOWED_FILTERS:
             return JSONResponse(
                 status_code=400,
-                content={
-                    "error": "Invalid filter. Allowed values: due_soon, flagged, inbox."
-                },
+                content={"error": "Invalid filter. Allowed: due_soon, flagged, inbox"},
             )
-        args.append(filter)
+        args.append(filter_value)
 
     try:
         output = run_script(script_path, *args)
-        logger.info("listTasks AppleScript output: %s", output)
         return json.loads(output)
-    except json.JSONDecodeError as exc:
-        logger.exception("Failed to decode JSON from listTasks output")
+    except json.JSONDecodeError:
+        logger.exception("Invalid JSON from list_tasks script")
         return JSONResponse(
             status_code=500,
             content={"error": "Invalid JSON returned from list_tasks script"},
         )
     except AppleScriptError as exc:
-        logger.exception("AppleScript error during listTasks")
+        logger.exception("AppleScript error in list_tasks")
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 @app.post("/mcp/summarize_tasks")
-async def summarize_tasks(payload: dict | None = None):
-    logger.info("Received summarizeTasks request")
+async def summarize_tasks(payload: dict | None = None) -> dict | JSONResponse:
+    """Get a summary of tasks grouped by project."""
+    from datetime import datetime, timezone
+
+    logger.info("summarize_tasks request received")
 
     tasks_response = await list_tasks(payload)
-    if isinstance(tasks_response, JSONResponse) and tasks_response.status_code != 200:
+    if isinstance(tasks_response, JSONResponse):
         return tasks_response
 
-    try:
-        tasks_data = tasks_response["tasks"]  # type: ignore[index]
-    except Exception:
-        logger.exception("Unexpected format from listTasks")
-        return JSONResponse(
-            status_code=500, content={"error": "Failed to read tasks for summary"}
-        )
-
-    from datetime import datetime, timezone, timedelta
-
+    tasks_data = tasks_response.get("tasks", [])
     now = datetime.now(timezone.utc)
     today_date = now.date()
 
-    def parse_due(due_str: str):
+    def parse_due(due_str: str) -> datetime | None:
         if not due_str:
             return None
         try:
-            # Expecting YYYY-MM-DDTHH:MM:SS
             return datetime.fromisoformat(due_str)
-        except Exception:
+        except ValueError:
             return None
 
-    summary: dict[str, dict[str, int | str]] = {}
+    summary: dict[str, dict] = {}
 
     for task in tasks_data:
         project = task.get("project", "") or ""
@@ -101,80 +106,85 @@ async def summarize_tasks(payload: dict | None = None):
         entry = summary[project]
 
         if not task.get("completed", False):
-            entry["active"] += 1  # type: ignore[assignment]
+            entry["active"] += 1
 
         if task.get("flagged", False):
-            entry["flagged"] += 1  # type: ignore[assignment]
+            entry["flagged"] += 1
 
-        due_str = task.get("due", "")
-        due_dt = parse_due(due_str)
+        due_dt = parse_due(task.get("due", ""))
         if due_dt:
             if due_dt.date() == today_date:
-                entry["due_today"] += 1  # type: ignore[assignment]
+                entry["due_today"] += 1
             if due_dt < now:
-                entry["overdue"] += 1  # type: ignore[assignment]
+                entry["overdue"] += 1
 
-    projects_list = list(summary.values())
-
-    logger.info("summarizeTasks result: %s", projects_list)
-    return {"projects": projects_list}
+    return {"projects": list(summary.values())}
 
 
 @app.post("/mcp/add_task", status_code=201)
-async def add_task(payload: dict):
+async def add_task(payload: dict) -> dict | JSONResponse:
+    """Add a new task to OmniFocus."""
     title = payload.get("title")
     project = payload.get("project")
-    script_path = Path(__file__).resolve().parent / "scripts" / "add_task.applescript"
-    logger.info("Received addTask request title=%s project=%s", title, project)
-    args = []
-    if title:
-        args.append(title)
+
+    if not title:
+        return JSONResponse(status_code=400, content={"error": "title is required"})
+
+    script_path = SCRIPTS_DIR / "add_task.applescript"
+    logger.info("add_task: title=%r project=%r", title, project)
+
+    args = [title]
     if project:
         args.append(project)
 
     try:
         output = run_script(script_path, *args)
-        logger.info("addTask AppleScript output: %s", output)
         return {"status": "ok", "output": output}
     except AppleScriptError as exc:
-        logger.exception("AppleScript error during addTask")
+        logger.exception("AppleScript error in add_task")
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 @app.post("/mcp/get_projects")
-async def get_projects(payload: dict | None = None):
-    script_path = Path(__file__).resolve().parent / "scripts" / "get_projects.applescript"
-    logger.info("Received getProjects request")
+async def get_projects(payload: dict | None = None) -> dict | JSONResponse:
+    """List all OmniFocus projects."""
+    script_path = SCRIPTS_DIR / "get_projects.applescript"
+    logger.info("get_projects request received")
+
     try:
         output = run_script(script_path)
-        logger.info("getProjects AppleScript output: %s", output)
         return json.loads(output)
-    except json.JSONDecodeError as exc:
-        logger.exception("Failed to decode JSON from getProjects output")
+    except json.JSONDecodeError:
+        logger.exception("Invalid JSON from get_projects script")
         return JSONResponse(
             status_code=500,
             content={"error": "Invalid JSON returned from get_projects script"},
         )
     except AppleScriptError as exc:
-        logger.exception("AppleScript error during getProjects")
+        logger.exception("AppleScript error in get_projects")
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 @app.post("/mcp/complete_task")
-async def complete_task(payload: dict):
+async def complete_task(payload: dict) -> dict | JSONResponse:
+    """Mark a task as completed."""
     task_id = payload.get("task_id")
-    script_path = Path(__file__).resolve().parent / "scripts" / "complete_task.applescript"
-    logger.info("Received completeTask request task_id=%s", task_id)
+
+    if not task_id:
+        return JSONResponse(status_code=400, content={"error": "task_id is required"})
+
+    script_path = SCRIPTS_DIR / "complete_task.applescript"
+    logger.info("complete_task: task_id=%r", task_id)
+
     try:
         output = run_script(script_path, task_id)
-        logger.info("completeTask AppleScript output: %s", output)
         return json.loads(output)
     except json.JSONDecodeError:
-        logger.exception("Failed to decode JSON from completeTask output")
+        logger.exception("Invalid JSON from complete_task script")
         return JSONResponse(
             status_code=500,
             content={"error": "Invalid JSON returned from complete_task script"},
         )
     except AppleScriptError as exc:
-        logger.exception("AppleScript error during completeTask")
+        logger.exception("AppleScript error in complete_task")
         return JSONResponse(status_code=500, content={"error": str(exc)})

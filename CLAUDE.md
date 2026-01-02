@@ -4,144 +4,121 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OmniFocus MCP Server: FastAPI-based HTTP server that exposes OmniFocus task management functionality to Model Context Protocol (MCP) hosts via AppleScript automation on macOS.
+OmniFocus MCP Server: Exposes OmniFocus task management to Claude Code and other MCP-compatible AI assistants via AppleScript automation on macOS.
 
 ## Architecture
 
-### Three-Layer Design
+```
+┌──────────────┐     stdio/JSON-RPC     ┌─────────────────┐
+│ Claude Code  │ ◄────────────────────► │  mcp_server.py  │
+└──────────────┘                        └────────┬────────┘
+                                                 │ osascript
+                                                 ▼
+                                        ┌─────────────────┐
+                                        │   OmniFocus     │
+                                        │   (AppleScript) │
+                                        └─────────────────┘
+```
 
-1. **FastAPI Server** (`server.py`)
-   - HTTP endpoints under `/mcp/*` namespace
-   - All endpoints use POST (even read operations) to support JSON request bodies
-   - Handles JSON parsing/serialization and error responses
-   - Delegates OmniFocus operations to AppleScript layer
+### Key Components
 
-2. **AppleScript Automation** (`scripts/*.applescript`)
-   - Direct OmniFocus application control via AppleScript
-   - Each script is standalone and returns JSON-formatted output
-   - Scripts are invoked via `osascript` subprocess calls
-   - Handle date formatting, escaping, and filtering logic
+| File | Purpose |
+|------|---------|
+| `mcp_server.py` | FastMCP server for Claude Code (stdio transport) |
+| `server.py` | FastAPI HTTP server (alternative REST API) |
+| `scripts/*.applescript` | Direct OmniFocus automation |
+| `utils/applescript.py` | `run_script()` wrapper, `AppleScriptError` |
+| `utils/omnifocus.py` | High-level Python API with `Task` dataclass |
 
-3. **Utility Layer** (`utils/`)
-   - `applescript.py`: Subprocess wrapper for executing AppleScript files
-   - `omnifocus.py`: Higher-level Python API (currently underutilized)
+### Design Patterns
 
-### Key Design Patterns
-
-- **AppleScript as Source of Truth**: All OmniFocus data operations happen in AppleScript, not Python
-- **JSON Communication**: AppleScripts construct JSON strings manually (no JSON libraries in AppleScript)
-- **Error Propagation**: AppleScript errors → `AppleScriptError` → HTTP 500 responses
-- **Filter Arguments**: `list_tasks.applescript` accepts optional filter arguments (flagged, due_soon, inbox)
+- **AppleScript as Source of Truth**: All OmniFocus operations happen in AppleScript
+- **JSON Communication**: AppleScripts construct JSON strings manually (no JSON library in AppleScript)
+- **Dual Interfaces**: MCP server for AI assistants, HTTP server for traditional clients
 
 ## Development Commands
 
-### Setup
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+# Setup
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-### Run Server
-```bash
-# Development mode with auto-reload
+# Run MCP server (for testing - normally started by Claude Code)
+python mcp_server.py
+
+# Run HTTP server
 uvicorn server:app --reload
 
-# Production mode
-uvicorn server:app --host 0.0.0.0 --port 8000
-```
-
-### Test AppleScripts Directly
-```bash
-# List all tasks
+# Test AppleScripts directly
 osascript scripts/list_tasks.applescript
-
-# List with filter (flagged, due_soon, or inbox)
 osascript scripts/list_tasks.applescript flagged
-
-# Add task
 osascript scripts/add_task.applescript "Task title" "Project name"
-
-# Get projects
-osascript scripts/get_projects.applescript
-
-# Complete task by ID
-osascript scripts/complete_task.applescript "task-id-here"
 ```
 
-## API Endpoints
+## MCP Tools
 
-All endpoints use POST with JSON bodies:
+The MCP server exposes these tools to Claude Code:
+
+| Tool | Args | Returns |
+|------|------|---------|
+| `list_tasks` | `filter?: "due_soon"\|"flagged"\|"inbox"` | `{tasks: [...]}` |
+| `summarize_tasks` | `filter?` | `{projects: [{project, active, flagged, due_today, overdue}]}` |
+| `add_task` | `title, project?` | `{status: "ok", output: ...}` |
+| `get_projects` | none | `{projects: [...]}` |
+| `complete_task` | `task_id` | `{status: "ok"}` |
+
+## HTTP Endpoints
+
+All `/mcp/*` endpoints use POST with JSON bodies:
 
 - `GET /health` - Health check
-- `POST /mcp/listTasks` - Optional body: `{"filter": "due_soon"|"flagged"|"inbox"}`
-- `POST /mcp/summarizeTasks` - Groups tasks by project with counts (active, flagged, due_today, overdue)
-- `POST /mcp/addTask` - Body: `{"title": "...", "project": "..."}`
-- `POST /mcp/getProjects` - Returns list of OmniFocus projects
-- `POST /mcp/completeTask` - Body: `{"task_id": "..."}`
+- `POST /mcp/list_tasks` - Optional: `{"filter": "due_soon"|"flagged"|"inbox"}`
+- `POST /mcp/summarize_tasks` - Groups tasks by project
+- `POST /mcp/add_task` - `{"title": "...", "project": "..."}`
+- `POST /mcp/get_projects` - List all projects
+- `POST /mcp/complete_task` - `{"task_id": "..."}`
 
-## Important Implementation Details
+## AppleScript Details
 
-### Date Handling
-- AppleScript formats dates as ISO 8601: `YYYY-MM-DDTHH:MM:SS`
-- Python parses with `datetime.fromisoformat()`
-- Timezone handling: `summarizeTasks` uses UTC for comparisons
+### Date Format
+AppleScript formats dates as ISO 8601: `YYYY-MM-DDTHH:MM:SS`
 
-### JSON Construction in AppleScript
-- Manual string concatenation (see `list_tasks.applescript:48-114`)
-- Helper functions: `json_escape()`, `iso_date_string()`, `zero_pad()`
-- Must escape: backslash, quotes, newlines
+### JSON Construction
+Manual string concatenation with helper functions:
+- `json_escape()` - Escapes backslash, quotes, newlines
+- `iso_date_string()` - Formats dates
+- `zero_pad()` - Pads numbers with leading zeros
 
 ### Task Fields
-- `id`: OmniFocus internal ID (text)
-- `name`/`title`: Task name (both used interchangeably)
-- `project`: Containing project name (empty string if none)
-- `due`: ISO date string or empty string
+- `id`: OmniFocus internal ID
+- `name`: Task name
+- `project`: Containing project (empty string if none)
+- `due`: ISO date or empty string
 - `flagged`: boolean
 - `completed`: boolean
-- `note`: Task notes/description
+- `note`: Task notes
 
-### Error Handling
-- `AppleScriptError` raised when `osascript` fails or returns invalid JSON
-- Server catches and returns HTTP 500 with error message
-- Logging at INFO level for all operations
-
-## File Locations
-
-- AppleScripts: `scripts/*.applescript` (relative to server.py)
-- Resolved via `Path(__file__).resolve().parent / "scripts" / "script_name.applescript"`
-- Utils module: `utils/applescript.py` and `utils/omnifocus.py`
-
-## Common Patterns
-
-### Adding New Endpoints
+## Adding New Tools
 
 1. Create AppleScript in `scripts/` that returns JSON
-2. Add endpoint in `server.py`:
+2. Add tool to `mcp_server.py`:
    ```python
-   @app.post("/mcp/newEndpoint")
-   async def new_endpoint(payload: dict):
-       script_path = Path(__file__).resolve().parent / "scripts" / "new_script.applescript"
+   @mcp.tool()
+   def new_tool(arg: str) -> dict:
+       """Tool description for the AI."""
+       script_path = SCRIPTS_DIR / "new_script.applescript"
        try:
-           output = run_script(script_path, *args)
+           output = run_script(script_path, arg)
            return json.loads(output)
        except AppleScriptError as exc:
-           return JSONResponse(status_code=500, content={"error": str(exc)})
+           return {"error": str(exc)}
    ```
-
-### AppleScript JSON Response Format
-All scripts should return valid JSON. Example structure:
-```applescript
-set jsonText to "{\"tasks\":["
-# ... build JSON string ...
-set jsonText to jsonText & "]}"
-return jsonText
-```
+3. Optionally add HTTP endpoint in `server.py`
 
 ## Dependencies
 
-- `fastapi` - Web framework
+- `mcp` - Model Context Protocol SDK (includes FastMCP)
+- `fastapi` - HTTP server framework
 - `uvicorn` - ASGI server
-- `requests` - HTTP client (may be unused)
 - Python 3.11+
 - macOS with OmniFocus installed
