@@ -50,18 +50,7 @@ on listFlaggedTasks()
 				return formatTask(t);
 			});
 
-			function formatTask(t) {
-				return {
-					id: t.id.primaryKey,
-					name: t.name,
-					project: t.containingProject ? t.containingProject.name : '',
-					due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-					defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-					flagged: t.flagged,
-					completed: false,
-					note: t.note || ''
-				};
-			}
+			" & my formatTaskFunction() & "
 
 			JSON.stringify({tasks: tasks})
 		"
@@ -74,16 +63,10 @@ on listDueSoonTasks()
 		set jsCode to "
 			const tasks = flattenedTasks.filter(t =>
 				t.taskStatus === Task.Status.DueSoon || t.taskStatus === Task.Status.Overdue
-			).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: t.containingProject ? t.containingProject.name : '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: false,
-				note: t.note || ''
-			}));
+			).map(t => formatTask(t));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
@@ -95,16 +78,10 @@ on listInboxTasks()
 		set jsCode to "
 			const tasks = inbox.filter(t =>
 				t.taskStatus !== Task.Status.Completed && t.taskStatus !== Task.Status.Dropped
-			).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: false,
-				note: t.note || ''
-			}));
+			).map(t => formatTask(t));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
@@ -116,16 +93,10 @@ on listCompletedTasks()
 		set jsCode to "
 			const tasks = flattenedTasks.filter(t =>
 				t.taskStatus === Task.Status.Completed
-			).slice(0, 100).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: t.containingProject ? t.containingProject.name : '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: true,
-				note: t.note || ''
-			}));
+			).slice(0, 100).map(t => formatTask(t, true));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
@@ -137,16 +108,10 @@ on listDeferredTasks()
 		set jsCode to "
 			const tasks = flattenedTasks.filter(t =>
 				t.taskStatus === Task.Status.Blocked && t.deferDate && t.deferDate > new Date()
-			).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: t.containingProject ? t.containingProject.name : '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: false,
-				note: t.note || ''
-			}));
+			).map(t => formatTask(t));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
@@ -158,16 +123,10 @@ on listAllTasks()
 		set jsCode to "
 			const tasks = flattenedTasks.filter(t =>
 				t.taskStatus !== Task.Status.Completed && t.taskStatus !== Task.Status.Dropped
-			).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: t.containingProject ? t.containingProject.name : '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: false,
-				note: t.note || ''
-			}));
+			).map(t => formatTask(t));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
@@ -180,18 +139,45 @@ on listAvailableTasks()
 			const availableStatuses = [Task.Status.Available, Task.Status.Next, Task.Status.DueSoon, Task.Status.Overdue];
 			const tasks = flattenedTasks.filter(t =>
 				availableStatuses.includes(t.taskStatus)
-			).map(t => ({
-				id: t.id.primaryKey,
-				name: t.name,
-				project: t.containingProject ? t.containingProject.name : '',
-				due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
-				defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
-				flagged: t.flagged,
-				completed: false,
-				note: t.note || ''
-			}));
+			).map(t => formatTask(t));
+
+			" & my formatTaskFunction() & "
+
 			JSON.stringify({tasks: tasks})
 		"
 		return evaluate javascript jsCode
 	end tell
 end listAvailableTasks
+
+on formatTaskFunction()
+	return "
+			function formatTask(t, isCompleted) {
+				// Parse repetition rule if present
+				let repetition = null;
+				if (t.repetitionRule) {
+					const ruleStr = String(t.repetitionRule);
+					// Extract the RRULE part (e.g., 'FREQ=WEEKLY;BYDAY=MO')
+					const match = ruleStr.match(/\\[object Task\\.RepetitionRule: ([^\\]]+)/);
+					if (match) {
+						const parts = match[1].split(' ');
+						repetition = {
+							rule: parts[0],  // e.g., 'FREQ=WEEKLY;BYDAY=MO'
+							method: parts[1] || 'DueDate'  // e.g., 'DueDate' or 'DeferUntilDate'
+						};
+					}
+				}
+
+				return {
+					id: t.id.primaryKey,
+					name: t.name,
+					project: t.containingProject ? t.containingProject.name : '',
+					due: t.dueDate ? t.dueDate.toISOString().slice(0, 19) : '',
+					defer: t.deferDate ? t.deferDate.toISOString().slice(0, 19) : '',
+					flagged: t.flagged,
+					completed: isCompleted || false,
+					note: t.note || '',
+					repetition: repetition
+				};
+			}
+	"
+end formatTaskFunction

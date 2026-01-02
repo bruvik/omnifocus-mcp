@@ -29,6 +29,7 @@ mcp = FastMCP(
 
 
 FilterType = Literal["due_soon", "flagged", "inbox", "all", "completed", "deferred"] | None
+RepetitionMethod = Literal["due", "defer", "fixed"] | None
 
 
 @mcp.tool()
@@ -135,13 +136,35 @@ def summarize_tasks(filter: FilterType = None) -> dict:
 
 
 @mcp.tool()
-def add_task(title: str, project: str | None = None) -> dict:
+def add_task(
+    title: str,
+    project: str | None = None,
+    due: str | None = None,
+    defer: str | None = None,
+    flagged: bool = False,
+    note: str | None = None,
+    rrule: str | None = None,
+    repeat_method: RepetitionMethod = None,
+) -> dict:
     """
     Add a new task to OmniFocus.
 
     Args:
         title: The task title/name (required)
         project: Optional project name to add the task to
+        due: Optional due date in ISO 8601 format (e.g., "2025-01-15" or "2025-01-15T17:00:00")
+        defer: Optional defer date in ISO 8601 format
+        flagged: Whether to flag the task (default: False)
+        note: Optional note text for the task
+        rrule: Optional iCalendar RRULE string for repetition. Examples:
+               - "FREQ=DAILY" - repeats every day
+               - "FREQ=WEEKLY" - repeats every week
+               - "FREQ=WEEKLY;BYDAY=MO,WE,FR" - repeats Mon, Wed, Fri
+               - "FREQ=MONTHLY;BYMONTHDAY=1" - repeats 1st of each month
+        repeat_method: How to calculate next occurrence (if rrule set):
+               - "due": Based on due date (default)
+               - "defer": Based on defer date
+               - "fixed": Fixed schedule
 
     Returns:
         Dictionary with status and the created task details
@@ -149,17 +172,33 @@ def add_task(title: str, project: str | None = None) -> dict:
     if not title or not title.strip():
         return {"error": "Task title is required"}
 
-    script_path = SCRIPTS_DIR / "add_task.applescript"
-    logger.info("add_task called: title=%r project=%r", title, project)
+    script_path = SCRIPTS_DIR / "add_task_omni.applescript"
+    logger.info("add_task called: title=%r project=%r due=%r defer=%r", title, project, due, defer)
 
-    args = [title]
+    # Build JSON input
+    task_data = {"title": title}
     if project:
-        args.append(project)
+        task_data["project"] = project
+    if due:
+        task_data["due"] = due
+    if defer:
+        task_data["defer"] = defer
+    if flagged:
+        task_data["flagged"] = flagged
+    if note:
+        task_data["note"] = note
+    if rrule:
+        task_data["rrule"] = rrule
+        if repeat_method:
+            task_data["repeat_method"] = repeat_method
 
     try:
-        output = run_script(script_path, *args)
+        output = run_script(script_path, json.dumps(task_data))
         logger.info("add_task output: %s", output)
-        return {"status": "ok", "output": output}
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from add_task")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
     except AppleScriptError as exc:
         logger.exception("AppleScript error in add_task")
         return {"error": str(exc)}
@@ -424,6 +463,47 @@ def resume_project(task_id: str) -> dict:
         return {"error": f"Invalid JSON from AppleScript: {exc}"}
     except AppleScriptError as exc:
         logger.exception("AppleScript error in resume_project")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def set_repetition(task_id: str, rrule: str | None = None, method: RepetitionMethod = "due") -> dict:
+    """
+    Set or clear the repetition rule for a task in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        rrule: iCalendar RRULE string. Examples:
+               - "FREQ=DAILY" - repeats every day
+               - "FREQ=WEEKLY" - repeats every week
+               - "FREQ=WEEKLY;BYDAY=MO,WE,FR" - repeats Mon, Wed, Fri
+               - "FREQ=MONTHLY;BYMONTHDAY=1" - repeats 1st of each month
+               - "FREQ=YEARLY" - repeats yearly
+               - None or empty string - clears the repetition
+        method: How to calculate the next occurrence:
+               - "due": Next occurrence based on due date (default)
+               - "defer": Next occurrence based on defer date
+               - "fixed": Fixed schedule (not based on completion date)
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "set_repetition.applescript"
+    logger.info("set_repetition called: task_id=%r rrule=%r method=%r", task_id, rrule, method)
+
+    try:
+        rule_arg = rrule if rrule else "none"
+        method_arg = method if method else "due"
+        output = run_script(script_path, task_id, rule_arg, method_arg)
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from set_repetition")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in set_repetition")
         return {"error": str(exc)}
 
 
