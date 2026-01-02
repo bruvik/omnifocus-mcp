@@ -216,5 +216,185 @@ def complete_task(task_id: str) -> dict:
         return {"error": str(exc)}
 
 
+@mcp.tool()
+def drop_task(task_id: str) -> dict:
+    """
+    Drop (delete) a task in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("drop_task called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "drop")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from drop_task")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in drop_task")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def flag_task(task_id: str, flagged: bool = True) -> dict:
+    """
+    Flag or unflag a task in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        flagged: True to flag, False to unflag (default: True)
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    action = "flag" if flagged else "unflag"
+    logger.info("flag_task called: task_id=%r flagged=%r", task_id, flagged)
+
+    try:
+        output = run_script(script_path, task_id, action)
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from flag_task")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in flag_task")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def defer_task(task_id: str, defer_date: str | None = None) -> dict:
+    """
+    Set or clear the defer date of a task in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        defer_date: ISO 8601 date string (e.g., "2025-01-15" or "2025-01-15T09:00:00").
+                   If None or empty, clears the defer date.
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("defer_task called: task_id=%r defer_date=%r", task_id, defer_date)
+
+    try:
+        if defer_date:
+            output = run_script(script_path, task_id, "defer", defer_date)
+        else:
+            output = run_script(script_path, task_id, "clear_defer")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from defer_task")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in defer_task")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def set_due_date(task_id: str, due_date: str | None = None) -> dict:
+    """
+    Set or clear the due date of a task in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        due_date: ISO 8601 date string (e.g., "2025-01-15" or "2025-01-15T17:00:00").
+                 If None or empty, clears the due date.
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("set_due_date called: task_id=%r due_date=%r", task_id, due_date)
+
+    try:
+        if due_date:
+            output = run_script(script_path, task_id, "due", due_date)
+        else:
+            output = run_script(script_path, task_id, "clear_due")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from set_due_date")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in set_due_date")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def pause_project(task_id: str) -> dict:
+    """
+    Pause (put on hold) a project in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID of a task within the project
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("pause_project called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "pause")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from pause_project")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in pause_project")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def resume_project(task_id: str) -> dict:
+    """
+    Resume (reactivate) a paused project in OmniFocus.
+
+    Args:
+        task_id: The OmniFocus task ID of a task within the project
+
+    Returns:
+        Dictionary with status of the operation
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+
+    script_path = SCRIPTS_DIR / "update_task.applescript"
+    logger.info("resume_project called: task_id=%r", task_id)
+
+    try:
+        output = run_script(script_path, task_id, "resume")
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from resume_project")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in resume_project")
+        return {"error": str(exc)}
+
+
 if __name__ == "__main__":
     mcp.run()
