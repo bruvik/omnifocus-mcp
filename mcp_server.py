@@ -50,7 +50,8 @@ def list_tasks(filter: FilterType = None) -> dict:
         Dictionary with "tasks" key containing list of task objects.
         Each task has: id, name, project, due, defer, flagged, completed, note
     """
-    script_path = SCRIPTS_DIR / "list_tasks.applescript"
+    # Use Omni Automation script for better performance
+    script_path = SCRIPTS_DIR / "list_tasks_omni.applescript"
     logger.info("list_tasks called with filter=%s", filter)
 
     valid_filters = ("due_soon", "flagged", "inbox", "all", "completed", "deferred")
