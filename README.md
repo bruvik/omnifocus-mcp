@@ -181,7 +181,7 @@ osascript scripts/complete_task.applescript "task-id-here"
 
 ## License
 
-MIT
+GPL v3 - See [LICENSE](LICENSE) file for details.
 
 ## Todo
 
