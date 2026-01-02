@@ -287,6 +287,37 @@ def rename_task(task_id: str, new_name: str) -> dict:
 
 
 @mcp.tool()
+def move_task(task_id: str, destination: str) -> dict:
+    """
+    Move a task to a different project or to the inbox.
+
+    Args:
+        task_id: The OmniFocus task ID (from list_tasks)
+        destination: Target location - either a project name, project ID, or "inbox"
+
+    Returns:
+        Dictionary with status of the operation including the destination name
+    """
+    if not task_id or not task_id.strip():
+        return {"error": "task_id is required"}
+    if not destination or not destination.strip():
+        return {"error": "destination is required"}
+
+    script_path = SCRIPTS_DIR / "move_task.applescript"
+    logger.info("move_task called: task_id=%r destination=%r", task_id, destination)
+
+    try:
+        output = run_script(script_path, task_id, destination)
+        return json.loads(output)
+    except json.JSONDecodeError as exc:
+        logger.exception("Failed to decode JSON from move_task")
+        return {"error": f"Invalid JSON from AppleScript: {exc}"}
+    except AppleScriptError as exc:
+        logger.exception("AppleScript error in move_task")
+        return {"error": str(exc)}
+
+
+@mcp.tool()
 def drop_project(task_id: str) -> dict:
     """
     Drop a project in OmniFocus (mark as dropped/abandoned).

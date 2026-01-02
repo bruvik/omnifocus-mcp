@@ -82,6 +82,7 @@ Once connected, Claude Code can use these tools:
 | `get_projects` | List all OmniFocus projects |
 | `complete_task` | Mark a task as completed by ID |
 | `rename_task` | Rename a task |
+| `move_task` | Move a task to a different project or inbox |
 | `delete_task` | Permanently delete a task by ID |
 | `flag_task` | Flag or unflag a task |
 | `defer_task` | Set or clear a task's defer date |
@@ -179,7 +180,7 @@ MIT
 - [x] Rename tasks (rename_task tool)
 - [x] Handle notes (add_task supports note parameter)
 - [x] Create task should be able to create a task in a specific project (already works)
-- [ ] Move task around in the Projects hierarchy
+- [x] Move task around in the Projects hierarchy (move_task tool)
 - [ ] Manipulate tags on tasks
 - [ ] Handle locations
 - [ ] Logic to read, write and manipulate notes on existing tasks
