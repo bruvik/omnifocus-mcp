@@ -1,19 +1,5 @@
-on json_escape(theText)
-	set theText to my replaceText("\\", "\\\\", theText)
-	set theText to my replaceText("\"", "\\\"", theText)
-	set theText to my replaceText(linefeed, "\\n", theText)
-	set theText to my replaceText(return, "\\n", theText)
-	return theText
-end json_escape
-
-on replaceText(find, replace, subject)
-	set AppleScript's text item delimiters to find
-	set parts to text items of subject
-	set AppleScript's text item delimiters to replace
-	set subject to parts as text
-	set AppleScript's text item delimiters to ""
-	return subject
-end replaceText
+-- Complete a task in OmniFocus using Omni Automation
+-- Usage: osascript complete_task.applescript <task_id>
 
 on run argv
 	if (count of argv) is 0 then
@@ -21,20 +7,29 @@ on run argv
 	end if
 
 	set targetId to item 1 of argv
+
 	tell application "OmniFocus"
-		tell default document
-			try
-				set targetTask to first flattened task whose id is targetId
-				set completed of targetTask to true
+		set jsCode to "
+			const taskId = '" & targetId & "';
 
-				set taskId to my json_escape(id of targetTask as text)
-				set taskName to my json_escape(name of targetTask as text)
+			try {
+				const task = flattenedTasks.find(t => t.id.primaryKey === taskId);
+				if (!task) {
+					throw new Error('Task not found: ' + taskId);
+				}
 
-				return "{\"status\":\"ok\",\"id\":\"" & taskId & "\",\"name\":\"" & taskName & "\"}"
-			on error errMsg
-				set errEscaped to my json_escape(errMsg)
-				return "{\"error\":\"" & errEscaped & "\"}"
-			end try
-		end tell
+				// Use markComplete() which works for all task types including inbox
+				task.markComplete();
+
+				JSON.stringify({
+					status: 'ok',
+					id: task.id.primaryKey,
+					name: task.name
+				});
+			} catch (e) {
+				JSON.stringify({error: e.message});
+			}
+		"
+		return evaluate javascript jsCode
 	end tell
 end run
