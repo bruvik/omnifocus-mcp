@@ -19,6 +19,25 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Usage with Claude Desktop
+
+Edit Claude Desktop's config file at `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "omnifocus": {
+      "command": "/path/to/omnifocus-mcp/.venv/bin/python",
+      "args": ["/path/to/omnifocus-mcp/mcp_server.py"]
+    }
+  }
+}
+```
+
+Replace `/path/to/omnifocus-mcp` with the actual path to this repository.
+
+Restart Claude Desktop after editing the config.
+
 ## Usage with Claude Code
 
 ### Option 1: Add via CLI (Recommended)
@@ -60,7 +79,7 @@ Edit `~/.claude.json`:
 }
 ```
 
-### Verify Installation
+### Verify Installation (Claude Code)
 
 ```bash
 # List configured MCP servers
